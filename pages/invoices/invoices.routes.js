@@ -1,4 +1,13 @@
+// Express Router - creates modular route handlers for invoice operations
 const express = require("express");
+
+// Import controller functions - business logic for invoice operations
+// addInvoice - creates a new invoice for a customer
+// getInvoices - retrieves list of all invoices
+// getInvoice - gets single invoice by ID
+// recordPayment - marks invoice as paid and records payment details
+// deleteInvoiceById - deletes invoice by ID
+// generateMonthlyInvoices - bulk creates invoices for all customers
 const {
   addInvoice,
   getInvoices,
@@ -8,24 +17,42 @@ const {
   generateMonthlyInvoices,
 } = require("./invoices.controller");
 
+// Import authentication middleware - protects all invoice routes
+const authenticateToken = require("../../middleware/auth");
+
+// Create router instance - handles routes for /api/invoices
 const router = express.Router();
 
-// GET /api/invoices - list all invoices
-router.get("/", getInvoices);
+// ========== ALL ROUTES REQUIRE AUTHENTICATION ==========
 
-// GET /api/invoices/:id - get single invoice
-router.get("/:id", getInvoice);
+// GET /api/invoices - List all invoices
+// Returns array of all invoices with customer details populated
+router.get("/", authenticateToken, getInvoices);
 
-// POST /api/invoices - create new invoice
-router.post("/", addInvoice);
+// POST /api/invoices/generate-monthly - Generate invoices for all customers
+// IMPORTANT: Must be defined before /:id route to avoid route conflict
+// Creates invoices for current month for all customers who don't have one
+// Returns count of created and skipped invoices
+router.post("/generate-monthly", authenticateToken, generateMonthlyInvoices);
 
-// POST /api/invoices/generate-monthly - generate invoices for all customers
-router.post("/generate-monthly", generateMonthlyInvoices);
+// GET /api/invoices/:id - Get single invoice by ID
+// :id is URL parameter (e.g., /api/invoices/123)
+// Returns one invoice with customer details
+router.get("/:id", authenticateToken, getInvoice);
 
-// PUT /api/invoices/:id/payment - record payment for invoice
-router.put("/:id/payment", recordPayment);
+// POST /api/invoices - Create new invoice
+// Request body contains customerId, amount, billingPeriod, dueDate
+// Creates invoice and returns it with customer details
+router.post("/", authenticateToken, addInvoice);
 
-// DELETE /api/invoices/:id - delete invoice
-router.delete("/:id", deleteInvoiceById);
+// PUT /api/invoices/:id/payment - Record payment for invoice
+// Marks invoice as "Paid" and stores payment date, method, notes
+// :id identifies which invoice to update
+router.put("/:id/payment", authenticateToken, recordPayment);
 
+// DELETE /api/invoices/:id - Delete invoice
+// :id identifies which invoice to permanently remove
+router.delete("/:id", authenticateToken, deleteInvoiceById);
+
+// Export router so it can be mounted in server.js
 module.exports = router;
